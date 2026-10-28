@@ -60,11 +60,45 @@ button:disabled{opacity:.6;cursor:wait}.danger{background:#8d342e}.secondary{bac
       '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
     }[c]));
   }
-  async function request(path, options={}, useAuth=true) {
-    const headers = {'apikey':SUPABASE_KEY, 'Content-Type':'application/json', ...(options.headers||{})};
-    if (useAuth && accessToken) headers.Authorization = 'Bearer ' + accessToken;
-    else if (!useAuth) headers.Authorization = 'Bearer ' + SUPABASE_KEY;
-    const response = await fetch(SUPABASE_URL + path, {...options, headers});
+ async function request(path, options = {}, useAuth = true) {
+  const headers = {
+    apikey: SUPABASE_KEY,
+    'Content-Type': 'application/json',
+    ...(options.headers || {})
+  };
+
+  if (useAuth && accessToken) {
+    headers.Authorization = 'Bearer ' + accessToken;
+  } else if (useAuth) {
+    headers.Authorization = 'Bearer ' + SUPABASE_KEY;
+  }
+
+  const response = await fetch(SUPABASE_URL + path, {
+    ...options,
+    headers
+  });
+
+  const bodyText = await response.text();
+  let body = null;
+
+  try {
+    body = bodyText ? JSON.parse(bodyText) : null;
+  } catch {}
+
+  if (!response.ok) {
+    const detail =
+      body?.msg ||
+      body?.message ||
+      body?.error_description ||
+      body?.hint ||
+      bodyText ||
+      ('HTTP ' + response.status);
+
+    throw new Error(detail);
+  }
+
+  return body;
+}
     const bodyText = await response.text();
     let body = null;
     try { body = bodyText ? JSON.parse(bodyText) : null; } catch {}
