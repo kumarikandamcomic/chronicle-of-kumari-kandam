@@ -397,33 +397,28 @@ footer{align-items:center}
     <section class="closing"><div class="closing-symbol">✦</div><p>THE LEGEND IS ONLY BEGINNING</p><h2>Every forgotten story<br>deserves to be found.</h2><a href="#read">Return to the comic ↑</a></section>
   </main>
   <footer><span>© <span id="year"></span> Chronicle of Kumari Kandam</span><span>Independent creator project</span><div class="footer-links"><a href="#home">Back to top ↑</a><a href="admin.html">Creator access</a></div></footer>
-  <script>
-// Standalone preview mode: demo reviews are stored in this browser only.
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// Supabase-backed reviews and copy requests. Keep the original layout and comic reader unchanged.
+const SUPABASE_URL = 'https://dzgmiyclvuenatkfijwz.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_ddowd75H1tpslnbM6UuRhQ_2Q-lKi1R';
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $ = (s) => document.querySelector(s);
 $('#year').textContent = new Date().getFullYear();
-const form = $('#review-form'), list = $('#review-list'), count = $('#review-count');
-let reviews = [];
-try { reviews = JSON.parse(localStorage.getItem('ckk-demo-reviews') || '[]'); } catch(e) {}
-function render(){
-  const sorted = [...reviews].sort((a,b)=>$('#review-sort').value==='highest' ? b.rating-a.rating : b.time-a.time);
-  count.textContent = String(reviews.length);
-  list.innerHTML = sorted.length ? '' : '<div class="empty-state">The reader hall is waiting for its first reviews.</div>';
-  sorted.forEach(r=>{ const card=document.createElement('article'); card.className='review-card'; const name=document.createElement('h4'); name.textContent=r.name; const stars=document.createElement('p'); stars.className='review-stars'; stars.textContent='★'.repeat(r.rating)+'☆'.repeat(5-r.rating); const body=document.createElement('p'); body.textContent=r.review; card.append(name,stars,body); list.append(card); });
+const reviewForm = $('#review-form'), reviewList = $('#review-list'), reviewCount = $('#review-count');
+const adminEmail = 'aravindh5278@gmail.com';
+function safeText(tag, className, value) { const el=document.createElement(tag); if(className) el.className=className; el.textContent=value ?? ''; return el; }
+async function renderReviews(){
+  const {data, error} = await db.from('reviews').select('id,reader_name,review_text,rating,created_at').eq('approved', true).order('created_at',{ascending:false});
+  if(error){ reviewList.innerHTML='<div class="empty-state">Reviews are temporarily unavailable. Please try again later.</div>'; reviewCount.textContent='—'; console.error(error); return; }
+  let rows=data||[]; if($('#review-sort').value==='highest') rows=[...rows].sort((a,b)=>(b.rating||0)-(a.rating||0));
+  reviewCount.textContent=String(rows.length); reviewList.replaceChildren();
+  if(!rows.length){reviewList.innerHTML='<div class="empty-state">The reader hall is waiting for its first approved reviews.</div>';return;}
+  rows.forEach(r=>{const card=document.createElement('article');card.className='review-card';const top=document.createElement('div');top.className='review-card-top';top.append(safeText('div','review-author',r.reader_name||'Anonymous'),safeText('div','review-date',r.created_at?new Date(r.created_at).toLocaleDateString():''));const stars=safeText('p','stars','★'.repeat(Math.max(0,Math.min(5,Number(r.rating)||0))));const body=safeText('p','review-body',r.review_text);card.append(top,stars,body);reviewList.append(card);});
 }
-form.addEventListener('submit', e=>{ e.preventDefault(); const data=new FormData(form); reviews.push({name:String(data.get('name')).trim() || 'Anonymous',rating:Number(data.get('rating')),review:String(data.get('review')).trim(),time:Date.now()}); try {localStorage.setItem('ckk-demo-reviews',JSON.stringify(reviews)); $('#form-message').textContent='Review saved in this browser preview.';} catch(e) {$('#form-message').textContent='Could not save review in this browser.';} form.reset(); render(); });
-$('#review-sort').addEventListener('change',render);
-render();
-
-document.querySelector('#copy-request-form')?.addEventListener('submit', function(event) {
-  event.preventDefault();
-  const email = document.querySelector('#copy-email').value.trim();
-  const interest = document.querySelector('#copy-type').value;
-  const subject = encodeURIComponent('Chronicle of Kumari Kandam — copy request');
-  const body = encodeURIComponent('Hello Aravindhan,\n\nI am interested in: ' + interest + '\nMy email address: ' + email + '\n\nPlease share the details.\n');
-  document.querySelector('#copy-request-message').textContent = 'Your email app should open with a request draft. Please send it to complete your request.';
-  window.location.href = 'mailto:aravindh5278@gmail.com?subject=' + subject + '&body=' + body;
-});
-
+reviewForm.addEventListener('submit', async e=>{e.preventDefault();const button=reviewForm.querySelector('button[type="submit"]');button.disabled=true;$('#form-message').textContent='Submitting review…';const data=new FormData(reviewForm);const payload={reader_name:String(data.get('name')||'').trim()||'Anonymous',rating:Number(data.get('rating')),review_text:String(data.get('review')||'').trim(),approved:false};const {error}=await db.from('reviews').insert(payload);button.disabled=false;if(error){$('#form-message').textContent='Could not submit the review. Please try again.';console.error(error);return;}reviewForm.reset();$('#form-message').textContent='Thank you! Your review was sent to the creator for approval.';await renderReviews();});
+$('#review-sort').addEventListener('change',renderReviews); renderReviews();
+$('#copy-request-form').addEventListener('submit',async function(event){event.preventDefault();const button=this.querySelector('button[type="submit"]');button.disabled=true;$('#copy-request-message').textContent='Sending your request…';const email=$('#copy-email').value.trim();const interest=$('#copy-type').value;const {error}=await db.from('copy_requests').insert({email,interest});button.disabled=false;if(error){$('#copy-request-message').textContent='Could not save your request. Please try again or email aravindh5278@gmail.com.';console.error(error);return;}this.reset();$('#copy-request-message').textContent='Request sent successfully. Thank you! The creator will contact you by email.';});
 </script>
 <script>
 // Paginated comic reader: contained in its frame, with a gentle page-turn animation.
